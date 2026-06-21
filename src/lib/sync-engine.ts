@@ -35,10 +35,18 @@ export interface SyncResult {
   errors: string[];
 }
 
-import { supabase as supabaseClient } from './supabase';
+// Placeholder for Supabase client (will be initialized by the app)
+let supabaseClient: {
+  from: (table: string) => {
+    upsert: (records: Record<string, unknown>[]) => Promise<{ error: Error | null }>;
+    select: (columns?: string) => {
+      gt: (column: string, value: number) => Promise<{ data: Record<string, unknown>[] | null; error: Error | null }>;
+    };
+  };
+} | null = null;
 
-export function setSupabaseClient(client: any): void {
-  // Legacy function kept for compatibility, but we now use the direct import
+export function setSupabaseClient(client: typeof supabaseClient): void {
+  supabaseClient = client;
 }
 
 // ---------------------------------------------------------------------------

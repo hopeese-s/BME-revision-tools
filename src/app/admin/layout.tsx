@@ -6,7 +6,7 @@ import {
   LayoutDashboard,
   BookOpen,
   FileText,
-  ImageIcon,
+  Image,
   ChevronLeft,
   Shield,
 } from 'lucide-react';
@@ -15,7 +15,7 @@ const NAV_ITEMS = [
   { href: '/admin', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/admin/curriculum', label: 'Curriculum & Summaries', icon: BookOpen },
   { href: '/admin/content', label: 'Flashcards & Scenarios', icon: FileText },
-  { href: '/admin/media', label: 'Media & Uploads', icon: ImageIcon },
+  { href: '/admin/media', label: 'Media & Uploads', icon: Image },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

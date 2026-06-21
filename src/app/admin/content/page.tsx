@@ -230,8 +230,6 @@ export default function AdminContentPage() {
     if (!scModuleId || !scTitleEn) return;
     const db = await initDb();
     const id = uuidv4() as UUID;
-    const now = new Date().toISOString();
-
     await db.scenarios.put({
       id,
       module_id: scModuleId,
@@ -243,26 +241,10 @@ export default function AdminContentPage() {
       difficulty: null,
       time_limit_seconds: null,
       _sync_version: 0,
-      created_at: now,
-      updated_at: now,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
       deleted_at: null,
     });
-
-    // Create an initial entry node so the scenario can be started
-    await db.scenarioNodes.put({
-      id: uuidv4() as UUID,
-      scenario_id: id,
-      node_type: 'prompt',
-      content_en: 'Scenario Started. Please edit this entry node.',
-      content_th: null,
-      is_entry_point: true,
-      image_url: null,
-      _sync_version: 0,
-      created_at: now,
-      updated_at: now,
-      deleted_at: null,
-    });
-
     setScTitleEn(''); setScTitleTh(''); setScDescEn(''); setScDescTh('');
     setScenarios(await db.scenarios.toArray());
     showToast('Scenario added ✓');
