@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-
+import { v4 as uuidv4 } from 'uuid';
 import {
   FileText,
   BrainCircuit,
@@ -139,7 +139,7 @@ export default function AdminContentPage() {
   async function addFlashcard() {
     if (!fcModuleId || !fcFrontEn || !fcBackEn) return;
     const db = await initDb();
-    const id = crypto.randomUUID() as UUID;
+    const id = uuidv4() as UUID;
     const existing = await db.flashcards.where('module_id').equals(fcModuleId).count();
     await db.flashcards.put({
       id,
@@ -182,7 +182,7 @@ export default function AdminContentPage() {
   async function addEquation() {
     if (!eqModuleId || !eqNameEn || !eqLatex) return;
     const db = await initDb();
-    const id = crypto.randomUUID() as UUID;
+    const id = uuidv4() as UUID;
     let variables: { symbol: string; name_en: string; name_th: string | null; unit: string | null }[] = [];
     try {
       if (eqVarsJson.trim()) {
@@ -229,7 +229,7 @@ export default function AdminContentPage() {
   async function addScenario() {
     if (!scModuleId || !scTitleEn) return;
     const db = await initDb();
-    const id = crypto.randomUUID() as UUID;
+    const id = uuidv4() as UUID;
     const now = new Date().toISOString();
 
     await db.scenarios.put({
@@ -250,13 +250,13 @@ export default function AdminContentPage() {
 
     // Create an initial entry node so the scenario can be started
     await db.scenarioNodes.put({
-      id: crypto.randomUUID() as UUID,
+      id: uuidv4() as UUID,
       scenario_id: id,
       node_type: 'prompt',
       content_en: 'Scenario Started. Please edit this entry node.',
       content_th: null,
-      image_url: null,
       is_entry_point: true,
+      image_url: null,
       _sync_version: 0,
       created_at: now,
       updated_at: now,

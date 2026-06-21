@@ -6,7 +6,7 @@ import {
   LayoutDashboard,
   BookOpen,
   FileText,
-  FileText as ImageIcon,
+  ImageIcon,
   ChevronLeft,
   Shield,
 } from 'lucide-react';

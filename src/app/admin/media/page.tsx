@@ -1,17 +1,16 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-
+import { v4 as uuidv4 } from 'uuid';
 import {
-  FileText as ImageIcon,
+  ImageIcon,
   Upload,
   Trash2,
   Copy,
-  Check as CheckCircle2,
   Check,
   Link,
   Search,
-  FileText as FileImage,
+  FileImage,
 } from 'lucide-react';
 import { initDb } from '@/lib/db';
 import type { UUID, MediaAsset } from '@/types/schema';
@@ -59,7 +58,7 @@ export default function AdminMediaPage() {
     }
 
     const db = await initDb();
-    const id = crypto.randomUUID() as UUID;
+    const id = uuidv4() as UUID;
 
     // Read file as base64 data URL
     const reader = new FileReader();

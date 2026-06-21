@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-
+import { v4 as uuidv4 } from 'uuid';
 import {
   BookOpen,
   GraduationCap,
@@ -75,7 +75,7 @@ export default function AdminCurriculumPage() {
     const n = parseInt(newYearNum, 10);
     if (!n || isNaN(n) || n < 1 || n > 4) return;
     const db = await initDb();
-    const id = crypto.randomUUID() as UUID;
+    const id = uuidv4() as UUID;
     await db.years.put({
       id,
       year_number: n as 1 | 2 | 3 | 4,
@@ -98,7 +98,7 @@ export default function AdminCurriculumPage() {
     const n = parseInt(newSemNum, 10);
     if (!n || isNaN(n) || n < 1 || n > 3) return;
     const db = await initDb();
-    const id = crypto.randomUUID() as UUID;
+    const id = uuidv4() as UUID;
     await db.semesters.put({
       id,
       year_id: yearId,
@@ -119,7 +119,7 @@ export default function AdminCurriculumPage() {
   async function addCourse(semesterId: UUID) {
     if (!newCourseCode || !newCourseTitleEn) return;
     const db = await initDb();
-    const id = crypto.randomUUID() as UUID;
+    const id = uuidv4() as UUID;
     const existing = await db.courses.toArray();
     const maxOrder = existing.filter(c => c.semester_id === semesterId).length;
     await db.courses.put({
@@ -150,7 +150,7 @@ export default function AdminCurriculumPage() {
   async function addModule(courseId: UUID) {
     if (!newModTitleEn) return;
     const db = await initDb();
-    const id = crypto.randomUUID() as UUID;
+    const id = uuidv4() as UUID;
     const existing = await db.modules.toArray();
     const maxOrder = existing.filter(m => m.course_id === courseId).length;
     await db.modules.put({
