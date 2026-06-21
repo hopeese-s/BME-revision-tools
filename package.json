@@ -35,10 +35,8 @@
     "@types/react-dom": "^19.0.0",
     "@types/uuid": "^10.0.0",
     "autoprefixer": "^10.5.0",
-    "next-pwa": "^5.6.0",
     "postcss": "^8.5.15",
     "tailwindcss": "^4.3.1",
-    "typescript": "^5.6.0",
-    "workbox-webpack-plugin": "^7.0.0"
+    "typescript": "^5.6.0"
   }
 }

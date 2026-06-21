@@ -13,7 +13,7 @@
 // Style: impeccable.style — brutalist, high-density, zero AI slop
 // ============================================================================
 
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 const ReactECharts = dynamic(() => import('echarts-for-react'), { ssr: false });
@@ -224,7 +224,7 @@ function buildSignalChartOption(signalData: unknown) {
 // Study Page Component
 // ---------------------------------------------------------------------------
 
-export default function StudyPage() {
+function StudyPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const moduleIdParam = searchParams.get('moduleId');
@@ -916,5 +916,13 @@ export default function StudyPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function StudyPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'var(--cream)' }}>Loading...</div>}>
+      <StudyPageInner />
+    </Suspense>
   );
 }
