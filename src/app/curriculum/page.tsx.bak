@@ -1,0 +1,559 @@
+'use client';
+
+// ============================================================================
+// EgBE Memory & Revision Engine — Curriculum Page
+//
+// Uses useSyllabusStore for all state management (Year → Semester → Course → Module).
+// Displays the curriculum tree and selected module content.
+//
+// Style: impeccable.style — brutalist, high-density, zero AI slop
+// ============================================================================
+
+import { useEffect, useState, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import { useSyllabusStore } from '@/stores/syllabus-store';
+import { useLanguageStore } from '@/stores/language-store';
+import type { UUID } from '@/types/schema';
+
+// ---------------------------------------------------------------------------
+// Curriculum Page
+// ---------------------------------------------------------------------------
+
+export default function CurriculumPage() {
+  const router = useRouter();
+
+  // Syllabus store — single source of truth for tree + selection
+  const {
+    years,
+    isLoading,
+    error,
+    selectedYearId,
+    selectedSemesterId,
+    selectedCourseId,
+    selectedModuleId,
+    flashcards,
+    equations,
+    occlusionSets,
+    scenarios,
+    loadCurriculum,
+    selectYear,
+    selectSemester,
+    selectCourse,
+    selectModule,
+  } = useSyllabusStore();
+
+  const { language, toggleLanguage, t } = useLanguageStore();
+
+  // Load curriculum on mount
+  useEffect(() => {
+    if (years.length === 0 && !isLoading && !error) {
+      loadCurriculum();
+    }
+  }, [years.length, isLoading, error, loadCurriculum]);
+
+  // Handlers — toggle selection logic
+  const handleYearClick = useCallback(
+    (yearId: UUID) => {
+      if (selectedYearId === yearId) {
+        selectYear(null as unknown as UUID); // deselect
+      } else {
+        selectYear(yearId);
+      }
+    },
+    [selectedYearId, selectYear],
+  );
+
+  const handleSemesterClick = useCallback(
+    (semesterId: UUID) => {
+      if (selectedSemesterId === semesterId) {
+        selectSemester(null as unknown as UUID);
+      } else {
+        selectSemester(semesterId);
+      }
+    },
+    [selectedSemesterId, selectSemester],
+  );
+
+  const handleCourseClick = useCallback(
+    (courseId: UUID) => {
+      if (selectedCourseId === courseId) {
+        selectCourse(null as unknown as UUID);
+      } else {
+        selectCourse(courseId);
+      }
+    },
+    [selectedCourseId, selectCourse],
+  );
+
+  const handleModuleClick = useCallback(
+    async (moduleId: UUID) => {
+      if (selectedModuleId === moduleId) {
+        selectModule(null as unknown as UUID);
+      } else {
+        await selectModule(moduleId);
+      }
+    },
+    [selectedModuleId, selectModule],
+  );
+
+  const handleStudyModule = (moduleId: UUID) => {
+    router.push(`/study?moduleId=${moduleId}`);
+  };
+
+  // Loading state
+  if (isLoading && years.length === 0) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-zinc-100 font-mono antialiased flex items-center justify-center">
+        <div className="text-sm text-zinc-500 animate-pulse">
+          Loading curriculum…
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-zinc-100 font-mono antialiased flex items-center justify-center">
+        <div className="border border-red-800 bg-red-950/20 p-6 max-w-md">
+          <div className="text-sm font-bold text-red-400 mb-2">Error</div>
+          <div className="text-xs text-red-300/70">{error}</div>
+          <button
+            onClick={() => loadCurriculum()}
+            className="mt-4 border border-red-700 text-red-400 text-xs px-3 py-1.5 hover:bg-red-950/50 transition-colors uppercase tracking-wider"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 font-mono antialiased">
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-zinc-800 pb-6 mb-8">
+          <div>
+            <h1 className="text-xl font-bold tracking-tight text-zinc-100 uppercase">
+              Curriculum
+            </h1>
+            <p className="text-xs text-zinc-500 mt-1">
+              {t('nav.curriculum')} — Year {'>'} Semester {'>'} Course {'>'} Module
+            </p>
+          </div>
+          {/* Language Toggle */}
+          <button
+            onClick={toggleLanguage}
+            className="border border-zinc-700 px-3 py-1.5 text-xs font-bold text-zinc-400 hover:text-teal-400 hover:border-teal-600 transition-colors uppercase tracking-wider"
+          >
+            {language === 'en' ? 'TH' : 'EN'}
+          </button>
+        </div>
+
+        {/* Empty State */}
+        {years.length === 0 && (
+          <div className="border border-zinc-800 bg-zinc-900/50 p-8 text-center">
+            <div className="text-sm text-zinc-400 mb-2">No curriculum data</div>
+            <p className="text-xs text-zinc-600">
+              Visit the{' '}
+              <a href="/" className="text-teal-500 hover:text-teal-400 underline">
+                home page
+              </a>{' '}
+              to seed data.
+            </p>
+          </div>
+        )}
+
+        {/* Two-Column Layout */}
+        <div className="flex gap-8 items-start">
+          {/* Left: Curriculum Tree */}
+          <div className="flex-1 min-w-0 space-y-1">
+            {years.map((year) => {
+              const isYearSelected = selectedYearId === year.id;
+              return (
+                <div key={year.id} className="border border-zinc-800 bg-zinc-900">
+                  {/* Year Row */}
+                  <button
+                    onClick={() => handleYearClick(year.id)}
+                    className={`w-full text-left px-4 py-3 flex items-center gap-2 transition-colors ${
+                      isYearSelected
+                        ? 'bg-teal-900/30 border-l-2 border-teal-500'
+                        : 'hover:bg-zinc-800/50'
+                    }`}
+                  >
+                    <span className="text-xs text-zinc-600 w-4 text-center">
+                      {isYearSelected ? '▾' : '▸'}
+                    </span>
+                    <span className="font-semibold text-zinc-200 text-sm">
+                      {language === 'th' && year.title_th ? year.title_th : year.title_en}
+                    </span>
+                    {language !== 'th' && year.title_th && (
+                      <span className="text-zinc-500 text-xs">({year.title_th})</span>
+                    )}
+                    {language === 'th' && year.title_en && (
+                      <span className="text-zinc-500 text-xs">({year.title_en})</span>
+                    )}
+                  </button>
+
+                  {/* Semesters */}
+                  {isYearSelected && (
+                    <div className="border-t border-zinc-800">
+                      {year.semesters.map((sem) => {
+                        const isSemSelected = selectedSemesterId === sem.id;
+                        return (
+                          <div key={sem.id}>
+                            <button
+                              onClick={() => handleSemesterClick(sem.id)}
+                              className={`w-full text-left px-8 py-2 flex items-center gap-2 text-sm transition-colors ${
+                                isSemSelected
+                                  ? 'bg-teal-900/20 border-l-2 border-teal-500/60'
+                                  : 'hover:bg-zinc-800/30'
+                              }`}
+                            >
+                              <span className="text-xs text-zinc-600 w-4 text-center">
+                                {isSemSelected ? '▾' : '▸'}
+                              </span>
+                              <span className="text-zinc-300">
+                                {language === 'th' && sem.title_th ? sem.title_th : sem.title_en}
+                              </span>
+                            </button>
+
+                            {/* Courses */}
+                            {isSemSelected && (
+                              <div className="border-t border-zinc-800/50">
+                                {sem.courses.map((course) => {
+                                  const isCourseSelected = selectedCourseId === course.id;
+                                  return (
+                                    <div key={course.id}>
+                                      <button
+                                        onClick={() => handleCourseClick(course.id)}
+                                        className={`w-full text-left px-12 py-1.5 flex items-center gap-2 text-sm transition-colors ${
+                                          isCourseSelected
+                                            ? 'bg-teal-900/15 border-l-2 border-teal-500/40'
+                                            : 'hover:bg-zinc-800/20'
+                                        }`}
+                                      >
+                                        <span className="text-xs text-zinc-600 w-4 text-center">
+                                          {isCourseSelected ? '▾' : '▸'}
+                                        </span>
+                                        <span className="text-zinc-500 font-mono text-xs w-16 shrink-0">
+                                          {course.course_code}
+                                        </span>
+                                        <span className="text-zinc-300 text-xs truncate">
+                                          {language === 'th' && course.title_th
+                                            ? course.title_th
+                                            : course.title_en}
+                                        </span>
+                                      </button>
+
+                                      {/* Modules */}
+                                      {isCourseSelected && (
+                                        <div className="pl-16 py-1 space-y-px">
+                                          {course.modules.map((mod) => {
+                                            const isModuleSelected =
+                                              selectedModuleId === mod.id;
+                                            return (
+                                              <div key={mod.id} className="flex items-center">
+                                                <button
+                                                  onClick={() => handleModuleClick(mod.id)}
+                                                  className={`flex-1 text-left px-3 py-1.5 text-xs transition-colors ${
+                                                    isModuleSelected
+                                                      ? 'bg-teal-500/10 text-teal-400 border-l-2 border-teal-400'
+                                                      : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/40'
+                                                  }`}
+                                                >
+                                                  {language === 'th' && mod.title_th
+                                                    ? mod.title_th
+                                                    : mod.title_en}
+                                                </button>
+                                                {/* Quick Study Button */}
+                                                <button
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleStudyModule(mod.id);
+                                                  }}
+                                                  className="shrink-0 text-[10px] text-zinc-600 hover:text-teal-400 border border-zinc-800 hover:border-teal-600 px-2 py-1 mx-1 uppercase tracking-wider transition-colors"
+                                                  title="Study this module"
+                                                >
+                                                  Study
+                                                </button>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Right: Content Panel */}
+          <div className="w-96 shrink-0 space-y-4 sticky top-8">
+            {/* Module Info */}
+            {selectedModuleId && (
+              <div className="border border-zinc-800 bg-zinc-900">
+                {/* Module Header */}
+                <div className="border-b border-zinc-800 px-4 py-3 flex items-center justify-between">
+                  <div>
+                    <div className="text-xs text-zinc-500 uppercase tracking-widest">
+                      Module
+                    </div>
+                    <div className="text-sm font-semibold text-zinc-200 mt-0.5">
+                      {language === 'th'
+                        ? (() => {
+                            for (const year of years) {
+                              for (const sem of year.semesters) {
+                                for (const course of sem.courses) {
+                                  const mod = course.modules.find(
+                                    (m) => m.id === selectedModuleId,
+                                  );
+                                  if (mod) return mod.title_th || mod.title_en;
+                                }
+                              }
+                            }
+                            return '';
+                          })()
+                        : (() => {
+                            for (const year of years) {
+                              for (const sem of year.semesters) {
+                                for (const course of sem.courses) {
+                                  const mod = course.modules.find(
+                                    (m) => m.id === selectedModuleId,
+                                  );
+                                  if (mod) return mod.title_en;
+                                }
+                              }
+                            }
+                            return '';
+                          })()}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => handleStudyModule(selectedModuleId)}
+                    className="border border-teal-700 bg-teal-900/30 text-teal-300 text-xs px-3 py-1.5 font-bold hover:bg-teal-900/50 hover:border-teal-500 transition-colors uppercase tracking-wider"
+                  >
+                    Study Now
+                  </button>
+                </div>
+
+                {/* Content Tabs */}
+                <ContentTabs
+                  flashcards={flashcards}
+                  equations={equations}
+                  occlusionSets={occlusionSets}
+                  scenarios={scenarios}
+                  language={language}
+                  onSelectModule={handleModuleClick}
+                />
+              </div>
+            )}
+
+            {/* Empty selection hint */}
+            {!selectedModuleId && (
+              <div className="border border-zinc-800 bg-zinc-900/50 p-6 text-center">
+                <div className="text-xs text-zinc-500 uppercase tracking-widest mb-2">
+                  Content Panel
+                </div>
+                <p className="text-xs text-zinc-600 leading-relaxed">
+                  Select a module from the tree to view its flashcards, equations,
+                  occlusion sets, and clinical scenarios.
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Content Tabs — displays flashcards, equations, occlusions, scenarios
+// ---------------------------------------------------------------------------
+
+type TabKey = 'flashcards' | 'equations' | 'occlusions' | 'scenarios';
+
+const TAB_LABELS_EN: Record<TabKey, string> = {
+  flashcards: 'Flashcards',
+  equations: 'Equations',
+  occlusions: 'Occlusions',
+  scenarios: 'Scenarios',
+};
+
+const TAB_LABELS_TH: Record<TabKey, string> = {
+  flashcards: 'แฟลชการ์ด',
+  equations: 'สมการ',
+  occlusions: 'การบดบังภาพ',
+  scenarios: 'สถานการณ์',
+};
+
+function ContentTabs({
+  flashcards,
+  equations,
+  occlusionSets,
+  scenarios,
+  language,
+  onSelectModule,
+}: {
+  flashcards: unknown[];
+  equations: unknown[];
+  occlusionSets: unknown[];
+  scenarios: unknown[];
+  language: 'en' | 'th';
+  onSelectModule: (id: UUID) => Promise<void>;
+}) {
+  const [activeTab, setActiveTab] = useState<TabKey>('flashcards');
+  const tabs = TAB_LABELS_EN;
+  const tabsTH = TAB_LABELS_TH;
+
+  const tabData: { key: TabKey; items: unknown[] }[] = [
+    { key: 'flashcards', items: flashcards },
+    { key: 'equations', items: equations },
+    { key: 'occlusions', items: occlusionSets },
+    { key: 'scenarios', items: scenarios },
+  ];
+
+  const activeItems = tabData.find((t) => t.key === activeTab)?.items ?? [];
+
+  return (
+    <div>
+      {/* Tab Bar — brutalist, no rounded corners */}
+      <div className="flex border-b border-zinc-800">
+        {tabData.map(({ key }) => {
+          const isActive = activeTab === key;
+          return (
+            <button
+              key={key}
+              onClick={() => setActiveTab(key)}
+              className={`flex-1 text-xs py-2 font-medium border-r border-zinc-800 last:border-r-0 transition-colors uppercase tracking-wider ${
+                isActive
+                  ? 'bg-zinc-800 text-teal-400 border-b-2 border-b-teal-500'
+                  : 'text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800/50'
+              }`}
+            >
+              {language === 'th' ? tabsTH[key] : tabs[key]}
+              <span className="ml-1 text-zinc-600">
+                ({tabData.find((t) => t.key === key)?.items.length ?? 0})
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Tab Content */}
+      <div className="max-h-[60vh] overflow-y-auto">
+        {activeItems.length === 0 ? (
+          <div className="p-6 text-center">
+            <p className="text-xs text-zinc-600">
+              No {language === 'th' ? tabsTH[activeTab] : tabs[activeTab].toLowerCase()} in this module.
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-zinc-800/50">
+            {activeItems.map((item: any, idx: number) => (
+              <div key={item.id ?? idx} className="px-4 py-3">
+                {/* Flashcard */}
+                {'front_en' in item && (
+                  <div>
+                    <div className="text-xs text-zinc-300 font-medium mb-1 line-clamp-2">
+                      {language === 'th' && item.front_th
+                        ? item.front_th
+                        : item.front_en}
+                    </div>
+                    <div className="text-[11px] text-teal-500/70 line-clamp-2">
+                      {language === 'th' && item.back_th
+                        ? item.back_th
+                        : item.back_en}
+                    </div>
+                    <div className="flex gap-1 mt-1.5 flex-wrap">
+                      {item.tags?.map((tag: string) => (
+                        <span
+                          key={tag}
+                          className="text-[9px] border border-zinc-700 text-zinc-500 px-1.5 py-0.5"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                      {item.difficulty_tier && (
+                        <span className="text-[9px] border border-teal-700/50 text-teal-500/70 px-1.5 py-0.5 ml-auto">
+                          T{item.difficulty_tier}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Equation */}
+                {item.equation_type && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[9px] uppercase text-zinc-500 tracking-wider">
+                        {item.equation_type}
+                      </span>
+                      <span className="text-xs font-mono text-teal-400">
+                        {item.latex}
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-zinc-500 line-clamp-2">
+                      {language === 'th' && item.description_th
+                        ? item.description_th
+                        : item.description_en}
+                    </div>
+                  </div>
+                )}
+
+                {/* Occlusion Set */}
+                {item.mask_type && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[9px] uppercase text-zinc-500 tracking-wider">
+                        {item.mask_type}
+                      </span>
+                      <span className="text-xs text-zinc-400">{item.label}</span>
+                    </div>
+                    <div className="text-[10px] text-zinc-500">
+                      {item.mask_count ?? item.masks?.length ?? 0} mask(s)
+                    </div>
+                  </div>
+                )}
+
+                {/* Scenario */}
+                {'presentation_en' in item && (
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-[9px] uppercase text-zinc-500 tracking-wider">
+                        {item.scenario_type ?? 'clinical'}
+                      </span>
+                      <span className="text-[9px] text-zinc-600">
+                        {item.level}
+                      </span>
+                    </div>
+                    <div className="text-xs text-zinc-300 line-clamp-2">
+                      {language === 'th' && item.presentation_th
+                        ? item.presentation_th
+                        : item.presentation_en}
+                    </div>
+                    <div className="text-[10px] text-zinc-600 mt-0.5">
+                      Choices: {item.mcq_choices?.length ?? 0}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

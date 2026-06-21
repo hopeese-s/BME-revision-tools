@@ -1,0 +1,328 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { initDb, getDb } from '@/lib/db';
+
+export default function HomePage() {
+  const [isSeeded, setIsSeeded] = useState<boolean | null>(null);
+  const [counts, setCounts] = useState({ flashcards: 0, concepts: 0, scenarios: 0 });
+
+  useEffect(() => {
+    loadAndSeed();
+  }, []);
+
+  async function loadAndSeed() {
+    const db = await initDb();
+    // Check if data already seeded
+    const cardCount = await db.flashcards.count();
+    if (cardCount > 0) {
+      setIsSeeded(true);
+      await refreshCounts(db);
+      return;
+    }
+
+    // Load seed modules dynamically
+    try {
+      const { seedFlashcards, seedConcepts, seedEdges, seedScenarios, seedScenarioNodes, seedScenarioTransitions } =
+        await import('@/data/seed');
+
+      // Seed curriculum modules (simplified: since this is local-only for prototype, create placeholder modules)
+      const moduleIds = [
+        { id: 'mod-anatomy' as string, title: 'Anatomy', course: 'mod-course-1' },
+        { id: 'mod-physiology' as string, title: 'Physiology', course: 'mod-course-1' },
+        { id: 'mod-biochemistry' as string, title: 'Biochemistry', course: 'mod-course-1' },
+        { id: 'mod-biomaterials' as string, title: 'Biomaterials', course: 'mod-course-2' },
+        { id: 'mod-biomechanics' as string, title: 'Biomechanics', course: 'mod-course-2' },
+        { id: 'mod-instrumentation' as string, title: 'Medical Instrumentation', course: 'mod-course-2' },
+        { id: 'mod-signals' as string, title: 'Signals & Systems', course: 'mod-course-3' },
+        { id: 'mod-imaging' as string, title: 'Medical Imaging', course: 'mod-course-3' },
+        { id: 'mod-clinical' as string, title: 'Clinical Engineering', course: 'mod-course-4' },
+      ];
+
+      const now = new Date().toISOString();
+
+      // Insert placeholder years/semesters/courses/modules
+      for (let y = 1; y <= 4; y++) {
+        await db.years.put({
+          id: `year-${y}` as never,
+          year_number: y as 1 | 2 | 3 | 4,
+          title_en: `Year ${y}`,
+          title_th: `ปี ${y}`,
+          description_en: null,
+          description_th: null,
+          _sync_version: 0,
+          created_at: now,
+          updated_at: now,
+          deleted_at: null,
+        } as never);
+
+        for (let s = 1; s <= (y === 4 ? 1 : 2); s++) {
+          const semId = `sem-${y}-${s}`;
+          await db.semesters.put({
+            id: semId as never,
+            year_id: `year-${y}` as never,
+            semester_number: s as 1 | 2 | 3,
+            title_en: `Semester ${s}`,
+            title_th: `ภาคเรียนที่ ${s}`,
+            _sync_version: 0,
+            created_at: now,
+            updated_at: now,
+            deleted_at: null,
+          } as never);
+
+          // Courses
+          const courseIds = y <= 2
+            ? [1, 2].map(c => `course-${y}-${s}-${c}`)
+            : y === 3
+              ? [1, 2, 3].map(c => `course-${y}-${s}-${c}`)
+              : [1].map(c => `course-${y}-${s}-${c}`);
+
+          for (const [i, cid] of courseIds.entries()) {
+            await db.courses.put({
+              id: cid as never,
+              semester_id: semId as never,
+              course_code: `EGBE${y}0${i + 1}`,
+              title_en: `BME Course ${y}.${s}.${i + 1}`,
+              title_th: `วิชา BME ${y}.${s}.${i + 1}`,
+              description_en: null,
+              description_th: null,
+              credit_hours: 3,
+              color_hex: null,
+              icon_name: null,
+              sort_order: i,
+              _sync_version: 0,
+              created_at: now,
+              updated_at: now,
+              deleted_at: null,
+            } as never);
+          }
+        }
+      }
+
+      // Seed modules
+      for (const mod of moduleIds) {
+        await db.modules.put({
+          id: mod.id as never,
+          course_id: mod.course as never,
+          title_en: mod.title,
+          title_th: null,
+          description_en: null,
+          description_th: null,
+          sort_order: 0,
+          _sync_version: 0,
+          created_at: now,
+          updated_at: now,
+          deleted_at: null,
+        } as never);
+      }
+
+      // Seed flashcards
+      for (const card of seedFlashcards) {
+        await db.flashcards.put({
+          ...card,
+          front_latex: null,
+          back_latex: null,
+          front_markdown: null,
+          back_markdown: null,
+          occlusion_set_id: null,
+          _sync_version: 0,
+          created_at: now,
+          updated_at: now,
+          deleted_at: null,
+        } as never);
+      }
+
+      // Seed concept nodes
+      for (const node of seedConcepts) {
+        await db.conceptNodes.put({
+          ...node,
+          graph_x: null,
+          graph_y: null,
+          importance: null,
+          _sync_version: 0,
+          created_at: now,
+          updated_at: now,
+          deleted_at: null,
+        } as never);
+      }
+
+      // Seed concept edges
+      for (const edge of seedEdges) {
+        await db.conceptEdges.put({
+          ...edge,
+          _sync_version: 0,
+          created_at: now,
+          updated_at: now,
+          deleted_at: null,
+        } as never);
+      }
+
+      // Seed scenarios
+      for (const sc of seedScenarios) {
+        await db.scenarios.put({
+          ...sc,
+          time_limit_seconds: null,
+          difficulty: null,
+          _sync_version: 0,
+          created_at: now,
+          updated_at: now,
+          deleted_at: null,
+        } as never);
+      }
+
+      // Seed scenario nodes
+      for (const sn of seedScenarioNodes) {
+        await db.scenarioNodes.put({
+          ...sn,
+          image_url: null,
+          _sync_version: 0,
+          created_at: now,
+          updated_at: now,
+          deleted_at: null,
+        } as never);
+      }
+
+      // Seed scenario transitions
+      for (const st of seedScenarioTransitions) {
+        await db.scenarioTransitions.put({
+          ...st,
+          _sync_version: 0,
+          created_at: now,
+          updated_at: now,
+          deleted_at: null,
+        } as never);
+      }
+
+      setIsSeeded(true);
+      await refreshCounts(db);
+    } catch (err) {
+      console.error('Seed failed:', err);
+      setIsSeeded(false);
+    }
+  }
+
+  async function refreshCounts(db: ReturnType<typeof getDb>) {
+    const dbInst = await db;
+    const [flashcards, concepts, scenarios] = await Promise.all([
+      dbInst.flashcards.count(),
+      dbInst.conceptNodes.count(),
+      dbInst.scenarios.count(),
+    ]);
+    setCounts({ flashcards, concepts, scenarios });
+  }
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 py-12">
+      <div className="text-center mb-12">
+        <h1 className="text-4xl font-bold text-teal-400 mb-4">
+          EgBE Memory Engine
+        </h1>
+        <p className="text-zinc-400 text-lg max-w-xl mx-auto">
+          Spaced Repetition, Knowledge Graph & Clinical Scenarios for
+          Biomedical Engineering students at Mahidol University
+        </p>
+      </div>
+
+      {isSeeded === null && (
+        <div className="text-center py-12">
+          <div className="animate-spin w-8 h-8 border-2 border-teal-400 border-t-transparent rounded-full mx-auto mb-4" />
+          <p className="text-zinc-500">Loading curriculum data…</p>
+        </div>
+      )}
+
+      {isSeeded === false && (
+        <div className="text-center py-12">
+          <p className="text-red-400">Failed to load seed data. Check console for details.</p>
+        </div>
+      )}
+
+      {isSeeded === true && (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-10">
+            <a
+              href="/curriculum"
+              className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 hover:border-teal-500/50 transition-colors group"
+            >
+              <div className="text-3xl mb-3">📚</div>
+              <h3 className="font-semibold text-zinc-200 group-hover:text-teal-400 transition-colors">
+                Curriculum
+              </h3>
+              <p className="text-zinc-500 text-sm mt-1">
+                Browse Year 1–4 modules
+              </p>
+              <p className="text-teal-500 text-xs mt-3 font-mono">
+                {counts.flashcards} flashcards
+              </p>
+            </a>
+
+            <a
+              href="/study"
+              className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 hover:border-teal-500/50 transition-colors group"
+            >
+              <div className="text-3xl mb-3">🧠</div>
+              <h3 className="font-semibold text-zinc-200 group-hover:text-teal-400 transition-colors">
+                Study
+              </h3>
+              <p className="text-zinc-500 text-sm mt-1">
+                FSRS-5 spaced repetition
+              </p>
+              <p className="text-teal-500 text-xs mt-3 font-mono">
+                Start review session
+              </p>
+            </a>
+
+            <a
+              href="/scenarios"
+              className="bg-zinc-900 border border-zinc-800 rounded-xl p-6 hover:border-teal-500/50 transition-colors group"
+            >
+              <div className="text-3xl mb-3">⚕️</div>
+              <h3 className="font-semibold text-zinc-200 group-hover:text-teal-400 transition-colors">
+                Scenarios
+              </h3>
+              <p className="text-zinc-500 text-sm mt-1">
+                Clinical troubleshooting
+              </p>
+              <p className="text-teal-500 text-xs mt-3 font-mono">
+                {counts.scenarios} scenarios
+              </p>
+            </a>
+          </div>
+
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
+            <h2 className="text-lg font-semibold text-zinc-200 mb-2">
+              Knowledge Graph
+            </h2>
+            <p className="text-zinc-400 text-sm mb-2">
+              {counts.concepts} concept nodes connected by prerequisite, application, and extension edges.
+            </p>
+            <a
+              href="/graph"
+              className="inline-block text-teal-400 hover:text-teal-300 text-sm font-medium transition-colors"
+            >
+              Explore graph →
+            </a>
+          </div>
+
+          <div className="mt-10 grid grid-cols-2 sm:grid-cols-4 gap-4 text-center text-xs text-zinc-600">
+            <div className="bg-zinc-900 rounded-lg p-4">
+              <div className="text-teal-400 text-lg font-bold mb-1">FSRS-5</div>
+              <span>SRS Algorithm</span>
+            </div>
+            <div className="bg-zinc-900 rounded-lg p-4">
+              <div className="text-teal-400 text-lg font-bold mb-1">Offline</div>
+              <span>IndexedDB + PWA</span>
+            </div>
+            <div className="bg-zinc-900 rounded-lg p-4">
+              <div className="text-teal-400 text-lg font-bold mb-1">Bilingual</div>
+              <span>EN / TH</span>
+            </div>
+            <div className="bg-zinc-900 rounded-lg p-4">
+              <div className="text-teal-400 text-lg font-bold mb-1">BME</div>
+              <span>Mahidol Curriculum</span>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

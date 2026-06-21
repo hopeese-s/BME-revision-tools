@@ -1,0 +1,557 @@
+/* ============================================================================
+ * IMPECCABLE.STYLE — Brutalist / Minimalist Design System
+ * Zero AI slop. Sharp edges. Monospace. Maximum utility density.
+ * ============================================================================
+ *
+ * Design Principles:
+ * 1. ZERO border-radius anywhere (sharp edges)
+ * 2. Monospace-first typography (SF Mono, JetBrains Mono, Consolas)
+ * 3. No shadows, no gradients, no blurs — flat surfaces only
+ * 4. Maximum information density, minimum whitespace
+ * 5. High contrast: zinc-950 (#09090b) on zinc-100 (#f4f4f5)
+ * 6. Single accent: teal-400 (#2dd4bf) — used sparingly
+ * 7. UPPERCASE labels, tight letter-spacing
+ * 8. 1px borders only, zinc-800 on dark, zinc-300 on light
+ * 9. No transitions > 100ms (snappy, performant)
+ * 10. Grid-based layouts, monospace tabular numbers
+ * ============================================================================
+ */
+
+/* ---------------------------------------------------------------------------
+ * Design Tokens
+ * ---------------------------------------------------------------------------
+ */
+
+:root {
+  /* ---- Color Palette ---- */
+  --imp-bg-primary: #09090b;       /* zinc-950 */
+  --imp-bg-secondary: #18181b;     /* zinc-900 */
+  --imp-bg-tertiary: #27272a;      /* zinc-800 */
+  --imp-bg-hover: #3f3f46;         /* zinc-700 */
+  --imp-bg-active: #52525b;        /* zinc-600 */
+
+  --imp-fg-primary: #f4f4f5;       /* zinc-100 */
+  --imp-fg-secondary: #a1a1aa;     /* zinc-400 */
+  --imp-fg-tertiary: #71717a;      /* zinc-500 */
+  --imp-fg-disabled: #52525b;      /* zinc-600 */
+
+  --imp-accent: #2dd4bf;           /* teal-400 */
+  --imp-accent-hover: #5eead4;     /* teal-300 */
+  --imp-accent-dim: #0d9488;       /* teal-600 */
+  --imp-accent-bg: rgba(45, 212, 191, 0.10);
+  --imp-accent-bg-hover: rgba(45, 212, 191, 0.15);
+
+  --imp-success: #34d399;          /* emerald-400 */
+  --imp-warning: #fbbf24;          /* amber-400 */
+  --imp-error: #f87171;            /* red-400 */
+  --imp-info: #38bdf8;             /* sky-400 */
+
+  --imp-border: #27272a;           /* zinc-800 */
+  --imp-border-hover: #3f3f46;     /* zinc-700 */
+  --imp-border-accent: rgba(45, 212, 191, 0.30);
+
+  /* ---- Typography ---- */
+  --imp-font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', 'Cascadia Code', 'Fira Code', Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  --imp-font-sans: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+  --imp-text-xs: 0.6875rem;        /* 11px */
+  --imp-text-sm: 0.75rem;          /* 12px */
+  --imp-text-base: 0.8125rem;      /* 13px */
+  --imp-text-md: 0.875rem;         /* 14px */
+  --imp-text-lg: 1rem;             /* 16px */
+  --imp-text-xl: 1.125rem;         /* 18px */
+  --imp-text-2xl: 1.25rem;         /* 20px */
+  --imp-text-3xl: 1.5rem;          /* 24px */
+  --imp-text-4xl: 2rem;            /* 32px */
+
+  --imp-leading-tight: 1.15;
+  --imp-leading-normal: 1.4;
+  --imp-leading-relaxed: 1.6;
+
+  --imp-tracking-tight: -0.02em;
+  --imp-tracking-normal: 0;
+  --imp-tracking-wide: 0.05em;
+  --imp-tracking-wider: 0.08em;
+
+  /* ---- Spacing (8px grid) ---- */
+  --imp-space-0: 0;
+  --imp-space-1: 0.25rem;          /* 4px */
+  --imp-space-2: 0.5rem;           /* 8px */
+  --imp-space-3: 0.75rem;          /* 12px */
+  --imp-space-4: 1rem;             /* 16px */
+  --imp-space-5: 1.25rem;          /* 20px */
+  --imp-space-6: 1.5rem;           /* 24px */
+  --imp-space-8: 2rem;             /* 32px */
+  --imp-space-10: 2.5rem;          /* 40px */
+  --imp-space-12: 3rem;            /* 48px */
+  --imp-space-16: 4rem;            /* 64px */
+
+  /* ---- Borders ---- */
+  --imp-border-width: 1px;
+  --imp-border-width-thick: 2px;
+
+  /* ---- Z-Index ---- */
+  --imp-z-header: 50;
+  --imp-z-overlay: 100;
+  --imp-z-modal: 200;
+  --imp-z-toast: 300;
+}
+
+/* ---------------------------------------------------------------------------
+ * Global Resets
+ * ---------------------------------------------------------------------------
+ */
+
+*, *::before, *::after {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  transition-duration: 75ms !important;
+  transition-timing-function: step-end !important;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--imp-font-mono);
+  font-size: var(--imp-text-base);
+  line-height: var(--imp-leading-normal);
+  color: var(--imp-fg-primary);
+  background: var(--imp-bg-primary);
+  letter-spacing: var(--imp-tracking-normal);
+}
+
+/* ---------------------------------------------------------------------------
+ * Typography Utilities
+ * ---------------------------------------------------------------------------
+ */
+
+.imp-mono { font-family: var(--imp-font-mono); }
+.imp-sans { font-family: var(--imp-font-sans); }
+
+.imp-text-xs { font-size: var(--imp-text-xs); }
+.imp-text-sm { font-size: var(--imp-text-sm); }
+.imp-text-base { font-size: var(--imp-text-base); }
+.imp-text-md { font-size: var(--imp-text-md); }
+.imp-text-lg { font-size: var(--imp-text-lg); }
+.imp-text-xl { font-size: var(--imp-text-xl); }
+.imp-text-2xl { font-size: var(--imp-text-2xl); }
+.imp-text-3xl { font-size: var(--imp-text-3xl); }
+.imp-text-4xl { font-size: var(--imp-text-4xl); }
+
+.imp-tracking-tight { letter-spacing: var(--imp-tracking-tight); }
+.imp-tracking-wide { letter-spacing: var(--imp-tracking-wide); }
+.imp-tracking-wider { letter-spacing: var(--imp-tracking-wider); }
+
+.imp-leading-tight { line-height: var(--imp-leading-tight); }
+.imp-leading-relaxed { line-height: var(--imp-leading-relaxed); }
+
+.imp-label {
+  font-size: var(--imp-text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--imp-tracking-wider);
+  color: var(--imp-fg-tertiary);
+}
+
+.imp-mono-num {
+  font-feature-settings: 'tnum' 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------------------
+ * Layout & Grid
+ * ---------------------------------------------------------------------------
+ */
+
+.imp-container {
+  width: 100%;
+  max-width: 80rem;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--imp-space-4);
+  padding-right: var(--imp-space-4);
+}
+
+.imp-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--imp-space-4); }
+.imp-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--imp-space-4); }
+.imp-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--imp-space-4); }
+
+.imp-stack-1 { display: flex; flex-direction: column; gap: var(--imp-space-1); }
+.imp-stack-2 { display: flex; flex-direction: column; gap: var(--imp-space-2); }
+.imp-stack-3 { display: flex; flex-direction: column; gap: var(--imp-space-3); }
+.imp-stack-4 { display: flex; flex-direction: column; gap: var(--imp-space-4); }
+
+.imp-row-2 { display: flex; flex-direction: row; gap: var(--imp-space-2); align-items: center; }
+.imp-row-3 { display: flex; flex-direction: row; gap: var(--imp-space-3); align-items: center; }
+.imp-row-4 { display: flex; flex-direction: row; gap: var(--imp-space-4); align-items: center; }
+
+/* ---------------------------------------------------------------------------
+ * Surface Components
+ * ---------------------------------------------------------------------------
+ */
+
+.imp-surface {
+  background: var(--imp-bg-secondary);
+  border: var(--imp-border-width) solid var(--imp-border);
+}
+
+.imp-surface-hover:hover {
+  background: var(--imp-bg-tertiary);
+  border-color: var(--imp-border-hover);
+}
+
+.imp-surface-accent {
+  background: var(--imp-bg-secondary);
+  border: var(--imp-border-width) solid var(--imp-border);
+}
+
+.imp-surface-accent:hover {
+  border-color: var(--imp-border-accent);
+  background: var(--imp-bg-tertiary);
+}
+
+/* ---------------------------------------------------------------------------
+ * Button Components
+ * ---------------------------------------------------------------------------
+ */
+
+.imp-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--imp-space-2);
+  padding: var(--imp-space-2) var(--imp-space-4);
+  font-family: var(--imp-font-mono);
+  font-size: var(--imp-text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--imp-tracking-wider);
+  border: var(--imp-border-width) solid var(--imp-border);
+  background: var(--imp-bg-secondary);
+  color: var(--imp-fg-secondary);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  min-height: 2.125rem;
+}
+
+.imp-btn:hover {
+  background: var(--imp-bg-tertiary);
+  color: var(--imp-fg-primary);
+  border-color: var(--imp-border-hover);
+}
+
+.imp-btn:active {
+  background: var(--imp-bg-hover);
+}
+
+.imp-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.imp-btn-accent {
+  background: var(--imp-accent-bg);
+  border-color: var(--imp-accent-dim);
+  color: var(--imp-accent);
+}
+
+.imp-btn-accent:hover {
+  background: var(--imp-accent-bg-hover);
+  border-color: var(--imp-accent);
+  color: var(--imp-accent-hover);
+}
+
+.imp-btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--imp-fg-tertiary);
+}
+
+.imp-btn-ghost:hover {
+  background: var(--imp-bg-secondary);
+  border-color: var(--imp-border);
+  color: var(--imp-fg-secondary);
+}
+
+.imp-btn-danger {
+  background: rgba(248, 113, 113, 0.08);
+  border-color: rgba(248, 113, 113, 0.25);
+  color: var(--imp-error);
+}
+
+.imp-btn-danger:hover {
+  background: rgba(248, 113, 113, 0.15);
+  border-color: var(--imp-error);
+}
+
+.imp-btn-sm {
+  padding: var(--imp-space-1) var(--imp-space-2);
+  font-size: 0.625rem;
+  min-height: 1.625rem;
+}
+
+.imp-btn-lg {
+  padding: var(--imp-space-3) var(--imp-space-6);
+  font-size: var(--imp-text-sm);
+  min-height: 2.625rem;
+}
+
+/* ---------------------------------------------------------------------------
+ * Input / Form Components
+ * ---------------------------------------------------------------------------
+ */
+
+.imp-input {
+  width: 100%;
+  padding: var(--imp-space-2) var(--imp-space-3);
+  font-family: var(--imp-font-mono);
+  font-size: var(--imp-text-sm);
+  color: var(--imp-fg-primary);
+  background: var(--imp-bg-primary);
+  border: var(--imp-border-width) solid var(--imp-border);
+  outline: none;
+}
+
+.imp-input::placeholder {
+  color: var(--imp-fg-disabled);
+}
+
+.imp-input:focus {
+  border-color: var(--imp-accent);
+  background: var(--imp-bg-secondary);
+}
+
+.imp-input:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.imp-select {
+  appearance: none;
+  width: 100%;
+  padding: var(--imp-space-2) var(--imp-space-3);
+  font-family: var(--imp-font-mono);
+  font-size: var(--imp-text-sm);
+  color: var(--imp-fg-primary);
+  background: var(--imp-bg-primary);
+  border: var(--imp-border-width) solid var(--imp-border);
+  outline: none;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2371717a' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.5rem center;
+  padding-right: 2rem;
+}
+
+.imp-select:focus {
+  border-color: var(--imp-accent);
+}
+
+/* ---------------------------------------------------------------------------
+ * Badge / Tag Components
+ * ---------------------------------------------------------------------------
+ */
+
+.imp-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.375rem;
+  font-family: var(--imp-font-mono);
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--imp-tracking-wide);
+  border: var(--imp-border-width) solid;
+}
+
+.imp-badge-default {
+  background: var(--imp-bg-tertiary);
+  border-color: var(--imp-border);
+  color: var(--imp-fg-tertiary);
+}
+
+.imp-badge-accent {
+  background: var(--imp-accent-bg);
+  border-color: var(--imp-accent-dim);
+  color: var(--imp-accent);
+}
+
+.imp-badge-success {
+  background: rgba(52, 211, 153, 0.08);
+  border-color: rgba(52, 211, 153, 0.25);
+  color: var(--imp-success);
+}
+
+.imp-badge-warning {
+  background: rgba(251, 191, 36, 0.08);
+  border-color: rgba(251, 191, 36, 0.25);
+  color: var(--imp-warning);
+}
+
+.imp-badge-error {
+  background: rgba(248, 113, 113, 0.08);
+  border-color: rgba(248, 113, 113, 0.25);
+  color: var(--imp-error);
+}
+
+/* ---------------------------------------------------------------------------
+ * Divider
+ * ---------------------------------------------------------------------------
+ */
+
+.imp-divider {
+  width: 100%;
+  height: var(--imp-border-width);
+  background: var(--imp-border);
+  border: none;
+  margin: 0;
+}
+
+/* ---------------------------------------------------------------------------
+ * Table
+ * ---------------------------------------------------------------------------
+ */
+
+.imp-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--imp-text-xs);
+}
+
+.imp-table th {
+  text-align: left;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: var(--imp-tracking-wide);
+  color: var(--imp-fg-tertiary);
+  padding: var(--imp-space-2) var(--imp-space-3);
+  border-bottom: var(--imp-border-width-thick) solid var(--imp-border);
+  font-size: 0.625rem;
+}
+
+.imp-table td {
+  padding: var(--imp-space-2) var(--imp-space-3);
+  border-bottom: var(--imp-border-width) solid var(--imp-border);
+  color: var(--imp-fg-secondary);
+}
+
+.imp-table tr:hover td {
+  background: var(--imp-bg-secondary);
+  color: var(--imp-fg-primary);
+}
+
+/* ---------------------------------------------------------------------------
+ * Progress Bar
+ * ---------------------------------------------------------------------------
+ */
+
+.imp-progress {
+  width: 100%;
+  height: 4px;
+  background: var(--imp-bg-tertiary);
+  overflow: hidden;
+}
+
+.imp-progress-bar {
+  height: 100%;
+  background: var(--imp-accent);
+  min-width: 0;
+}
+
+/* ---------------------------------------------------------------------------
+ * Card (study flashcard surface)
+ * ---------------------------------------------------------------------------
+ */
+
+.imp-card {
+  background: var(--imp-bg-secondary);
+  border: var(--imp-border-width-thick) solid var(--imp-border);
+  padding: var(--imp-space-8);
+  min-height: 18rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.imp-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--imp-space-4);
+}
+
+.imp-card-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  font-size: var(--imp-text-lg);
+  line-height: var(--imp-leading-relaxed);
+  color: var(--imp-fg-primary);
+}
+
+/* ---------------------------------------------------------------------------
+ * Tooltip / Popover (brutalist)
+ * ---------------------------------------------------------------------------
+ */
+
+.imp-tooltip {
+  position: absolute;
+  z-index: var(--imp-z-overlay);
+  padding: var(--imp-space-2) var(--imp-space-3);
+  background: var(--imp-bg-primary);
+  border: var(--imp-border-width) solid var(--imp-border);
+  font-size: var(--imp-text-xs);
+  color: var(--imp-fg-secondary);
+  white-space: nowrap;
+}
+
+/* ---------------------------------------------------------------------------
+ * Scrollbar
+ * ---------------------------------------------------------------------------
+ */
+
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--imp-bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--imp-bg-hover);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--imp-bg-active);
+}
+
+/* ---------------------------------------------------------------------------
+ * Focus visible (accessibility)
+ * ---------------------------------------------------------------------------
+ */
+
+:focus-visible {
+  outline: var(--imp-border-width-thick) solid var(--imp-accent);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+ * Print styles (no decorations)
+ * ---------------------------------------------------------------------------
+ */
+
+@media print {
+  * {
+    background: white !important;
+    color: black !important;
+    border-color: #ccc !important;
+  }
+}

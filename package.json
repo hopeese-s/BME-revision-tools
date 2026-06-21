@@ -1,0 +1,45 @@
+{
+  "name": "egbe-memory-engine",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Hyper-optimized offline-first PWA Memory & Revision Engine for Biomedical Engineering students at Mahidol University (EgBE)",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.108.2",
+    "@xstate/react": "^6.1.0",
+    "dexie": "^4.0.0",
+    "echarts": "^6.1.0",
+    "echarts-for-react": "^3.0.6",
+    "katex": "^0.16.47",
+    "lucide-react": "^1.21.0",
+    "next": "^15.0.0",
+    "perfect-freehand": "^1.2.3",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-markdown": "^9.1.0",
+    "rehype-katex": "^7.0.1",
+    "remark-math": "^6.0.0",
+    "uuid": "^10.0.0",
+    "xstate": "^5.0.0",
+    "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.1",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/uuid": "^10.0.0",
+    "autoprefixer": "^10.5.0",
+    "next-pwa": "^5.6.0",
+    "postcss": "^8.5.15",
+    "tailwindcss": "^4.3.1",
+    "typescript": "^5.6.0",
+    "workbox-webpack-plugin": "^7.0.0"
+  }
+}

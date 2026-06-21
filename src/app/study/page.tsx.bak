@@ -1,0 +1,723 @@
+'use client';
+
+// ============================================================================
+// EgBE Memory & Revision Engine — Study Page
+//
+// BME Enhancements (per Principal Architect directive):
+//  1. Cram Mode Toggle — bypasses FSRS, no stability/difficulty update
+//  2. Derivation Scratchpad — HTML5 canvas with perfect-freehand smoothing
+//  3. Signal Interactive Cards — dynamic waveform via ECharts
+//  4. KaTeX Markdown rendering for LaTeX math in card content
+//  5. EN/TH Language Toggle
+//
+// Style: impeccable.style — brutalist, high-density, zero AI slop
+// ============================================================================
+
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
+import ReactECharts from 'echarts-for-react';
+import ReactMarkdown from 'react-markdown';
+import remarkMath from 'remark-math';
+import rehypeKatex from 'rehype-katex';
+import { getStroke } from 'perfect-freehand';
+import { useStudySessionStore } from '@/stores/study-session-store';
+import { useSyllabusStore } from '@/stores/syllabus-store';
+import { useLanguageStore, type Language } from '@/stores/language-store';
+import type { Flashcard, UUID } from '@/types/schema';
+import type { FSRSRating } from '@/lib/fsrs';
+import 'katex/dist/katex.min.css';
+
+// ---------------------------------------------------------------------------
+// KaTeX Markdown Renderer — renders LaTeX math in flashcard content
+// ---------------------------------------------------------------------------
+
+function MarkdownContent({ text }: { text: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkMath]}
+      rehypePlugins={[rehypeKatex]}
+    >
+      {text}
+    </ReactMarkdown>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Canvas Drawing Hook with perfect-freehand smoothing
+// ---------------------------------------------------------------------------
+
+interface StrokePoint {
+  x: number;
+  y: number;
+  pressure?: number;
+}
+
+function useDrawingCanvas(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
+  const isDrawing = useRef(false);
+  const pointsRef = useRef<StrokePoint[]>([]);
+  const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
+  const canvasRectRef = useRef<DOMRect | null>(null);
+
+  const initCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    canvasRectRef.current = rect;
+    canvas.width = rect.width * window.devicePixelRatio;
+    canvas.height = rect.height * window.devicePixelRatio;
+    const ctx = canvas.getContext('2d')!;
+    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    ctx.strokeStyle = '#2dd4bf'; // teal-400 (impeccable accent)
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctxRef.current = ctx;
+  }, [canvasRef]);
+
+  const getPos = useCallback((e: React.MouseEvent | React.TouchEvent): StrokePoint => {
+    const canvas = canvasRef.current!;
+    const rect = canvasRectRef.current ?? canvas.getBoundingClientRect();
+    const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const pressure = 'touches' in e ? ((e as React.TouchEvent).touches[0] as any).force as number ?? 0.5 : 0.5;
+    return { x: clientX - rect.left, y: clientY - rect.top, pressure };
+  }, [canvasRef]);
+
+  const renderStroke = useCallback((points: StrokePoint[]) => {
+    const ctx = ctxRef.current;
+    if (!ctx || points.length < 2) return;
+
+    // Use perfect-freehand to get smoothed stroke outline
+    const outlinePoints = getStroke(points, {
+      size: 3,
+      thinning: 0.5,
+      smoothing: 0.8,
+      streamline: 0.5,
+      simulatePressure: true,
+    });
+
+    if (outlinePoints.length < 2) return;
+
+    ctx.beginPath();
+    ctx.moveTo(outlinePoints[0][0], outlinePoints[0][1]);
+    for (let i = 1; i < outlinePoints.length; i++) {
+      ctx.lineTo(outlinePoints[i][0], outlinePoints[i][1]);
+    }
+    ctx.closePath();
+    ctx.fillStyle = '#2dd4bf';
+    ctx.fill();
+  }, []);
+
+  const startDraw = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    isDrawing.current = true;
+    pointsRef.current = [getPos(e)];
+  }, [getPos]);
+
+  const draw = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    if (!isDrawing.current) return;
+    const pos = getPos(e);
+    pointsRef.current.push(pos);
+    // Render in realtime with perfect-freehand smoothing
+    renderStroke(pointsRef.current);
+  }, [getPos, renderStroke]);
+
+  const stopDraw = useCallback(() => {
+    isDrawing.current = false;
+    // Final render of completed stroke
+    if (pointsRef.current.length > 1) {
+      renderStroke(pointsRef.current);
+    }
+    pointsRef.current = [];
+  }, [renderStroke]);
+
+  const clearCanvas = useCallback(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = ctxRef.current;
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width / window.devicePixelRatio, canvas.height / window.devicePixelRatio);
+    // Re-initialize canvas state after clear
+    ctx.strokeStyle = '#2dd4bf';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+  }, [canvasRef]);
+
+  return { initCanvas, startDraw, draw, stopDraw, clearCanvas };
+}
+
+// ---------------------------------------------------------------------------
+// Signal Data Parser → ECharts option
+// ---------------------------------------------------------------------------
+
+function buildSignalChartOption(signalData: unknown) {
+  // Accept { series: { name: string, data: number[] }[] } or { data: number[] }
+  let series: { name?: string; data: number[] }[] = [];
+
+  if (!signalData) {
+    return null;
+  }
+
+  if (typeof signalData === 'object' && signalData !== null) {
+    const sd = signalData as Record<string, unknown>;
+    if (Array.isArray(sd.series)) {
+      series = sd.series as { name?: string; data: number[] }[];
+    } else if (Array.isArray(sd.data)) {
+      series = [{ name: 'Signal', data: sd.data as number[] }];
+    }
+  }
+
+  if (series.length === 0) return null;
+
+  const xAxisData = series[0]?.data.map((_, i) => i) ?? [];
+
+  return {
+    backgroundColor: 'transparent',
+    grid: { top: 8, right: 8, bottom: 24, left: 36 },
+    xAxis: {
+      type: 'category' as const,
+      data: xAxisData,
+      axisLine: { lineStyle: { color: '#3f3f46' } },
+      axisLabel: { color: '#71717a', fontSize: 10 },
+      splitLine: { show: false },
+    },
+    yAxis: {
+      type: 'value' as const,
+      axisLine: { lineStyle: { color: '#3f3f46' } },
+      axisLabel: { color: '#71717a', fontSize: 10 },
+      splitLine: { lineStyle: { color: '#27272a' } },
+    },
+    series: series.map((s) => ({
+      name: s.name,
+      type: 'line' as const,
+      data: s.data,
+      smooth: true,
+      symbol: 'none',
+      lineStyle: { color: '#14b8a6', width: 2 },
+      areaStyle: {
+        color: {
+          type: 'linear' as const,
+          x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [
+            { offset: 0, color: 'rgba(20,184,166,0.2)' },
+            { offset: 1, color: 'rgba(20,184,166,0.0)' },
+          ],
+        },
+      },
+    })),
+    tooltip: {
+      trigger: 'axis' as const,
+      backgroundColor: '#18181b',
+      borderColor: '#3f3f46',
+      textStyle: { color: '#d4d4d8', fontSize: 12 },
+    },
+    animation: true,
+    animationDuration: 800,
+    animationEasing: 'cubicInOut' as const,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Study Page Component
+// ---------------------------------------------------------------------------
+
+export default function StudyPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const moduleIdParam = searchParams.get('moduleId');
+
+  const {
+    status,
+    moduleTitle,
+    isLoading,
+    queue,
+    currentIndex,
+    totalCards,
+    remainingCards,
+    currentCard,
+    isFlipped,
+    isCramMode,
+    cardsReviewed,
+    streak,
+    longStreak,
+    averageRating,
+    loadSession,
+    flipCard,
+    rateCard,
+    nextCard,
+    completeSession,
+    resetSession,
+    getProgress,
+  } = useStudySessionStore();
+
+  const { years } = useSyllabusStore();
+  const { language, toggleLanguage, t } = useLanguageStore();
+
+  // Extract flat module list from curriculum tree
+  const allModules = useMemo(() => {
+    const result: { id: UUID; title_en: string }[] = [];
+    for (const year of years) {
+      for (const sem of year.semesters) {
+        for (const course of sem.courses) {
+          for (const mod of course.modules) {
+            result.push(mod);
+          }
+        }
+      }
+    }
+    return result;
+  }, [years]);
+
+  const [cramModePref, setCramModePref] = useState(false);
+  const [showCramToggle, setShowCramToggle] = useState(true);
+
+  // Canvas ref for derivation scratchpad
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const drawing = useDrawingCanvas(canvasRef);
+
+  // Init canvas on mount and when isFlipped changes
+  useEffect(() => {
+    if (!isFlipped) {
+      drawing.initCanvas();
+    }
+  }, [isFlipped, drawing]);
+
+  // Determine if current card requires calculation scratchpad
+  const needsScratchpad = useMemo(() => {
+    if (!currentCard || currentCard.source !== 'flashcard') return false;
+    const card = currentCard.data as Flashcard;
+    return card.requires_calculation === true;
+  }, [currentCard]);
+
+  // Determine if current card is signal_interactive
+  const isSignalInteractive = useMemo(() => {
+    if (!currentCard || currentCard.source !== 'flashcard') return false;
+    const card = currentCard.data as Flashcard;
+    return card.card_type === 'signal_interactive' && !!card.signal_data;
+  }, [currentCard]);
+
+  // Build chart option for signal cards
+  const chartOption = useMemo(() => {
+    if (!isSignalInteractive || !currentCard) return null;
+    const card = currentCard.data as Flashcard;
+    return buildSignalChartOption(card.signal_data);
+  }, [isSignalInteractive, currentCard]);
+
+  // Progress
+  const progress = getProgress();
+
+  // Handle start session
+  const handleStartSession = async (modId: UUID, title: string) => {
+    setShowCramToggle(false);
+    await loadSession(modId, title, cramModePref);
+  };
+
+  // Handle rating
+  const handleRate = async (rating: FSRSRating) => {
+    await rateCard(rating);
+    nextCard();
+  };
+
+  // Handle complete
+  const handleComplete = async () => {
+    await completeSession();
+  };
+
+  // Handle back
+  const handleBack = () => {
+    resetSession();
+    setShowCramToggle(true);
+    setCramModePref(false);
+    router.push('/curriculum');
+  };
+
+  // Handle restart
+  const handleRestart = () => {
+    resetSession();
+    setShowCramToggle(true);
+    setCramModePref(false);
+  };
+
+  // Find module by param
+  const targetModule = moduleIdParam
+    ? allModules.find((m) => m.id === moduleIdParam) ?? null
+    : null;
+
+  // -----------------------------------------------------------------------
+  // RENDER: Module Selection / Cram Mode Toggle (pre-session)
+  // -----------------------------------------------------------------------
+  if (showCramToggle && !status || status === 'idle') {
+    return (
+      <div className="min-h-screen bg-zinc-950 text-zinc-100 font-mono antialiased">
+        <div className="max-w-2xl mx-auto px-4 py-12">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-zinc-800 pb-6 mb-8">
+            <div>
+              <h1 className="text-xl font-bold tracking-tight text-zinc-100 uppercase">
+                Study Session
+              </h1>
+              <p className="text-xs text-zinc-500 mt-1">
+                {targetModule
+                  ? targetModule.title_en
+                  : 'Select a module to begin'}
+              </p>
+            </div>
+            {/* Language Toggle EN|TH */}
+            <button
+              onClick={toggleLanguage}
+              className="border border-zinc-700 px-3 py-1.5 text-xs font-bold text-zinc-400 hover:text-teal-400 hover:border-teal-600 transition-colors uppercase tracking-wider"
+              title={t('study.start')}
+            >
+              {language === 'en' ? 'TH' : 'EN'}
+            </button>
+          </div>
+
+          {/* Cram Mode Toggle */}
+          <div className="mb-8 border border-zinc-800 bg-zinc-900/50 p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-sm font-semibold text-zinc-300">
+                  Cram Mode
+                </div>
+                <div className="text-xs text-zinc-500 mt-0.5 leading-relaxed">
+                  Study all cards without updating FSRS scheduling.
+                  <br />
+                  Stability & difficulty will NOT be affected.
+                </div>
+              </div>
+              <button
+                onClick={() => setCramModePref(!cramModePref)}
+                className={`
+                  relative w-12 h-6 border transition-colors
+                  ${cramModePref
+                    ? 'bg-teal-600 border-teal-400'
+                    : 'bg-zinc-800 border-zinc-700'
+                  }
+                `}
+                aria-label="Toggle Cram Mode"
+              >
+                <span
+                  className={`
+                    absolute top-0.5 left-0.5 w-4 h-4 bg-zinc-100 transition-transform
+                    ${cramModePref ? 'translate-x-6' : ''}
+                  `}
+                />
+              </button>
+            </div>
+            {cramModePref && (
+              <div className="mt-3 text-xs text-teal-400 border-t border-zinc-800 pt-3">
+                ⚡ CRAM MODE ACTIVE — cards reviewed in this session will not
+                affect your long-term memory scheduling.
+              </div>
+            )}
+          </div>
+
+          {/* Module List */}
+          {!moduleIdParam && (
+            <div className="space-y-1">
+              <div className="text-xs text-zinc-500 uppercase tracking-widest mb-3">
+                Available Modules
+              </div>
+              {allModules.map((mod) => (
+                <button
+                  key={mod.id}
+                  onClick={() =>
+                    router.push(`/study?moduleId=${mod.id}`)
+                  }
+                  className="w-full text-left px-3 py-2.5 border border-zinc-800 hover:border-zinc-600 bg-zinc-900 text-sm text-zinc-300 hover:text-zinc-100 transition-colors"
+                >
+                  {mod.title_en}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* Start button for targeted module */}
+          {targetModule && (
+            <button
+              onClick={() =>
+                handleStartSession(targetModule.id, targetModule.title_en)
+              }
+              className="mt-8 w-full py-3 border border-teal-600 bg-teal-900/30 text-teal-300 text-sm font-semibold hover:bg-teal-900/50 hover:border-teal-400 transition-colors uppercase tracking-wide"
+            >
+              Begin Session{cramModePref ? ' (Cram)' : ''}
+            </button>
+          )}
+
+          {/* Back button */}
+          <button
+            onClick={handleBack}
+            className="mt-4 w-full py-2 border border-zinc-800 text-zinc-500 text-xs hover:text-zinc-300 hover:border-zinc-600 transition-colors uppercase tracking-wide"
+          >
+            Back to Curriculum
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // -----------------------------------------------------------------------
+  // RENDER: Active Session
+  // -----------------------------------------------------------------------
+  return (
+    <div className="min-h-screen bg-zinc-950 text-zinc-100 font-mono antialiased select-none">
+      <div className="max-w-2xl mx-auto px-4 py-6">
+        {/* Top Bar */}
+        <div className="flex items-center justify-between border-b border-zinc-800 pb-4 mb-6">
+          <button
+            onClick={handleBack}
+            className="text-xs text-zinc-500 hover:text-zinc-300"
+          >
+            ← Exit
+          </button>
+          <div className="text-xs text-zinc-500">
+            {remainingCards} / {totalCards} remaining
+          </div>
+          <div className="flex items-center gap-3 text-xs text-zinc-600">
+            {isCramMode && (
+              <span className="text-teal-500 font-bold">CRAM</span>
+            )}
+            {/* Language Toggle in active session */}
+            <button
+              onClick={toggleLanguage}
+              className="border border-zinc-700 px-2 py-0.5 text-[10px] font-bold text-zinc-500 hover:text-teal-400 hover:border-teal-600 uppercase tracking-wider"
+            >
+              {language === 'en' ? 'TH' : 'EN'}
+            </button>
+            <span>Streak: {streak}</span>
+          </div>
+        </div>
+
+        {/* Module Title */}
+        <div className="text-xs text-zinc-600 uppercase tracking-widest mb-4">
+          {moduleTitle}
+        </div>
+
+        {/* Progress Bar */}
+        <div className="h-1 bg-zinc-900 border border-zinc-800 mb-6">
+          <div
+            className="h-full bg-teal-600 transition-all duration-300"
+            style={{ width: `${progress.percentage}%` }}
+          />
+        </div>
+
+        {/* Card Area */}
+        {currentCard && (
+          <div className="border border-zinc-800 bg-zinc-900">
+          {/* Card Type Badge */}
+            <div className="flex items-center justify-between px-3 py-1.5 border-b border-zinc-800 bg-zinc-900/70">
+              <span className="text-[10px] text-zinc-600 uppercase tracking-widest">
+                {currentCard.source}
+                {isSignalInteractive && ' · signal'}
+              </span>
+              {needsScratchpad && (
+                <span className="text-[10px] text-teal-600 uppercase tracking-widest">
+                  scratchpad available
+                </span>
+              )}
+            </div>
+
+            {/* Front Content */}
+            {'front_en' in currentCard.data && (
+              <div className="p-4">
+                <div className="text-base text-zinc-200 leading-relaxed">
+                  <MarkdownContent
+                    text={language === 'th' && (currentCard.data as Flashcard).front_th
+                      ? (currentCard.data as Flashcard).front_th!
+                      : (currentCard.data as Flashcard).front_en}
+                  />
+                </div>
+                {language === 'en' && (currentCard.data as Flashcard).front_th && (
+                  <p className="text-sm text-zinc-500 mt-1.5">
+                    {(currentCard.data as Flashcard).front_th}
+                  </p>
+                )}
+                {language === 'th' && (currentCard.data as Flashcard).front_en && (
+                  <p className="text-sm text-zinc-500 mt-1.5">
+                    {(currentCard.data as Flashcard).front_en}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Derivation Scratchpad (before flip) */}
+            {needsScratchpad && !isFlipped && (
+              <div className="border-t border-zinc-800 px-4 py-2">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[10px] text-zinc-500 uppercase tracking-widest">
+                    Derivation Scratchpad
+                  </span>
+                  <button
+                    onClick={drawing.clearCanvas}
+                    className="text-[10px] text-zinc-600 hover:text-zinc-400 border border-zinc-800 px-1.5 py-0.5"
+                  >
+                    Clear
+                  </button>
+                </div>
+                <canvas
+                  ref={canvasRef}
+                  className="w-full h-32 border border-zinc-800 bg-zinc-950/50 cursor-crosshair touch-none"
+                  onMouseDown={drawing.startDraw}
+                  onMouseMove={drawing.draw}
+                  onMouseUp={drawing.stopDraw}
+                  onMouseLeave={drawing.stopDraw}
+                  onTouchStart={drawing.startDraw}
+                  onTouchMove={drawing.draw}
+                  onTouchEnd={drawing.stopDraw}
+                  style={{ touchAction: 'none' }}
+                />
+                <div className="text-[9px] text-zinc-600 mt-1">
+                  Draw with mouse or stylus to derive equations before revealing
+                  the answer.
+                </div>
+              </div>
+            )}
+
+            {/* Signal Interactive Chart */}
+            {isSignalInteractive && chartOption && !isFlipped && (
+              <div className="border-t border-zinc-800 px-4 py-3">
+                <div className="text-[10px] text-zinc-500 uppercase tracking-widest mb-1.5">
+                  Dynamic Signal
+                </div>
+                <div className="border border-zinc-800 bg-zinc-950/50">
+                  <ReactECharts
+                    option={chartOption}
+                    style={{ height: 160 }}
+                    opts={{ renderer: 'canvas' }}
+                    notMerge
+                    lazyUpdate
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Flip Button (when not flipped) */}
+            {!isFlipped && (
+              <div className="px-4 pb-4">
+                <button
+                  onClick={flipCard}
+                  className="w-full py-3 border border-zinc-700 bg-zinc-800/50 text-zinc-300 text-sm font-semibold hover:border-teal-600 hover:text-teal-300 hover:bg-zinc-800 transition-colors uppercase tracking-wide"
+                >
+                  Reveal Answer
+                </button>
+              </div>
+            )}
+
+            {/* Back Content (after flip) */}
+            {isFlipped && 'back_en' in currentCard.data && (
+              <div className="border-t border-zinc-800 p-4">
+                <div className="text-sm text-teal-300 leading-relaxed">
+                  <MarkdownContent
+                    text={language === 'th' && (currentCard.data as Flashcard).back_th
+                      ? (currentCard.data as Flashcard).back_th!
+                      : (currentCard.data as Flashcard).back_en}
+                  />
+                </div>
+                {language === 'en' && (currentCard.data as Flashcard).back_th && (
+                  <p className="text-xs text-teal-500/70 mt-1.5">
+                    {(currentCard.data as Flashcard).back_th}
+                  </p>
+                )}
+                {language === 'th' && (currentCard.data as Flashcard).back_en && (
+                  <p className="text-xs text-teal-500/70 mt-1.5">
+                    {(currentCard.data as Flashcard).back_en}
+                  </p>
+                )}
+
+                {/* Show chart again on back for reference */}
+                {isSignalInteractive && chartOption && (
+                  <div className="mt-4 border border-zinc-800 bg-zinc-950/50">
+                    <ReactECharts
+                      option={chartOption}
+                      style={{ height: 160 }}
+                      opts={{ renderer: 'canvas' }}
+                      notMerge
+                      lazyUpdate
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Rating Buttons (after flip) */}
+            {isFlipped && (
+              <div className="border-t border-zinc-800 p-4">
+                <div className="text-[10px] text-zinc-600 uppercase tracking-widest mb-2">
+                  How well did you know this?
+                </div>
+                <div className="grid grid-cols-4 gap-1.5">
+                  {([
+                    { label: 'Again', key: 1, cls: 'border-red-800 text-red-400 hover:bg-red-950/50 hover:border-red-600' },
+                    { label: 'Hard', key: 2, cls: 'border-orange-800 text-orange-400 hover:bg-orange-950/50 hover:border-orange-600' },
+                    { label: 'Good', key: 3, cls: 'border-teal-800 text-teal-400 hover:bg-teal-950/50 hover:border-teal-500' },
+                    { label: 'Easy', key: 4, cls: 'border-green-800 text-green-400 hover:bg-green-950/50 hover:border-green-500' },
+                  ] as { label: string; key: number; cls: string }[]).map(({ label, key, cls }) => (
+                    <button
+                      key={key}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRate(key as FSRSRating);
+                      }}
+                      className={`border py-2.5 text-xs font-semibold uppercase tracking-wide transition-colors ${cls}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Session Stats */}
+        <div className="mt-6 border border-zinc-800 bg-zinc-900/50 p-3">
+          <div className="grid grid-cols-4 gap-2 text-center">
+            <div>
+              <div className="text-xs text-zinc-500">Reviewed</div>
+              <div className="text-sm font-bold text-zinc-200">
+                {cardsReviewed}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-zinc-500">Streak</div>
+              <div className="text-sm font-bold text-zinc-200">{streak}</div>
+            </div>
+            <div>
+              <div className="text-xs text-zinc-500">Best</div>
+              <div className="text-sm font-bold text-zinc-200">
+                {longStreak}
+              </div>
+            </div>
+            <div>
+              <div className="text-xs text-zinc-500">Avg</div>
+              <div className="text-sm font-bold text-zinc-200">
+                {averageRating.toFixed(1)}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Complete / Restart */}
+        {status === 'complete' && (
+          <div className="mt-6 border border-teal-800 bg-teal-950/20 p-6 text-center">
+            <div className="text-sm font-bold text-teal-300 mb-1">
+              Session Complete
+            </div>
+            <div className="text-xs text-zinc-500 mb-4">
+              {cardsReviewed} cards reviewed · Streak: {streak}
+              {isCramMode && ' · Cram Mode'}
+            </div>
+            <button
+              onClick={handleRestart}
+              className="w-full py-2 border border-teal-800 text-teal-400 text-xs hover:bg-teal-950/50 hover:border-teal-500 transition-colors uppercase tracking-wide"
+            >
+              New Session
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
