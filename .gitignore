@@ -38,3 +38,4 @@ task/
 .cline/
 .clinerules
 CLINE_DIRECTIVE.md
+node_modules

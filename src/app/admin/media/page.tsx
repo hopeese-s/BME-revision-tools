@@ -1,16 +1,17 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { v4 as uuidv4 } from 'uuid';
+
 import {
-  Image,
+  FileText as ImageIcon,
   Upload,
   Trash2,
   Copy,
-  CheckCircle2,
+  Check as CheckCircle2,
+  Check,
   Link,
   Search,
-  FileImage,
+  FileText as FileImage,
 } from 'lucide-react';
 import { initDb } from '@/lib/db';
 import type { UUID, MediaAsset } from '@/types/schema';
@@ -58,7 +59,7 @@ export default function AdminMediaPage() {
     }
 
     const db = await initDb();
-    const id = uuidv4() as UUID;
+    const id = crypto.randomUUID() as UUID;
 
     // Read file as base64 data URL
     const reader = new FileReader();
@@ -220,7 +221,7 @@ export default function AdminMediaPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem', marginBottom: '2rem' }}>
         {[
           { icon: FileImage, label: 'Total', value: `${assets.length}` },
-          { icon: Image, label: 'Images', value: `${images.length}` },
+          { icon: ImageIcon, label: 'Images', value: `${images.length}` },
           { icon: Link, label: 'Videos', value: `${videos.length}` },
           { icon: Upload, label: 'Size', value: formatBytes(totalBytes) },
         ].map(({ icon: Icon, label, value }) => (
@@ -314,7 +315,7 @@ export default function AdminMediaPage() {
             color: 'var(--ink-faint)',
           }}
         >
-          <Image size={40} strokeWidth={1} style={{ margin: '0 auto 12px', opacity: 0.2 }} />
+          <ImageIcon size={40} strokeWidth={1} style={{ margin: '0 auto 12px', opacity: 0.2 }} />
           <p className="text-sm" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
             {searchQuery ? 'No matching files. Try a different search.' : 'No media uploaded yet. Drag & drop files above.'}
           </p>
